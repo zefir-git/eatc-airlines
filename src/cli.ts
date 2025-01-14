@@ -164,7 +164,7 @@ program.command("fetch")
         else {
             process.stdout.write(`Fetched ${flights.size} flights.\nWriting to ${location}…`);
             await fs.writeFile(location, json);
-            process.stdout.write(`\rWritten to ${location}\n`);
+            process.stdout.write(`\rWritten to ${location} \n`);
         }
     });
 
