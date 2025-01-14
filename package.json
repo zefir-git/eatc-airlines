@@ -1,0 +1,36 @@
+{
+  "name": "eatc-airlines",
+  "version": "0.0.0",
+  "description": "Command-line tool and API for retrieving air traffic data and generating airline configurations for EndlessATC custom airspaces.",
+  "keywords": [
+    "endlessatc",
+    "eatc",
+    "atc",
+    "airlines",
+    "traffic",
+    "airspace"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zefir-git/eatc-airlines/settings"
+  },
+  "license": "GPL-3.0",
+  "author": "Zefir Kirilov",
+  "type": "module",
+  "bin": "dist/cli.js",
+  "files": [
+    "dist/*.js",
+    "dist/*.d.ts",
+    "data/"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "commander": "^13.0.0"
+  }
+}
