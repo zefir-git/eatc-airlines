@@ -222,7 +222,7 @@ program.command("gen")
                 continue;
             }
 
-            if (flight.callsign !== null && flight.airline === null) {
+            if (flight.callsign !== null && (flight.airline === "{PVT}" || flight.airline === null)) {
                 // Regional registrations
                 if (flight.tail !== null) {
                     /**
