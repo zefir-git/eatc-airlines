@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  release:
+    types: [published]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+          cache: npm
+
+      - name: Install latest NPM
+        run: npm i -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack
+        run: npm pack
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: eatc-airlines-0.0.0-dev.tgz
+  publish:
+    name: Publish
+    needs: build
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+          cache: npm
+
+      - name: Install latest NPM
+        run: npm i -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: ./package
+
+      - name: Extract build package
+        working-directory: ./package
+        run: tar -xzf eatc-airlines-0.0.0-dev.tgz
+
+      - name: Set version from release tag
+        run: npm version ${{ github.event.release.tag_name }} --git-tag-version=false
+
+      - name: Copy package.json to build package
+        run: cp package.json package/package
+
+      - name: Publish release to NPM
+        if: "!github.event.release.prerelease"
+        working-directory: ./package/package
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+
+      - name: Publish release candidate to NPM
+        if: github.event.release.prerelease
+        working-directory: ./package/package
+        run: npm publish --provenance --access public --tag rc
+        env:
+          NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
