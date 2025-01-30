@@ -18,7 +18,7 @@ npm install -g eatc-airlines
 Stay up to date with the latest callsigns, bug fixes, and new features by updating to the newest version using:
 
 ```sh
-npm instal -g eatc-airlines
+npm instal -g eatc-airlines@latest
 ```
 
 ## Usage
