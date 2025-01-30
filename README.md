@@ -13,6 +13,14 @@ Install globally using the following command:
 npm install -g eatc-airlines
 ```
 
+### Updating
+
+Stay up to date with the latest callsigns, bug fixes, and new features by updating to the newest version using:
+
+```sh
+npm instal -g eatc-airlines
+```
+
 ## Usage
 
 Once installed, you can use the tool with the following command:
