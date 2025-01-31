@@ -142,7 +142,7 @@ program.command("fetch")
 
         const flights = new Map<number, Flight>();
 
-        const initial = await get(icao, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+        const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000));
         for (const flight of initial.list)
             flights.set(flight.id, flight);
         let more = initial.more;
