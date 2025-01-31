@@ -52,7 +52,7 @@ custom airspace.
 **Example:**
 
 ```sh
-eatc-airlines gen lhr.json /path/to/output.json ../directory/
+eatc-airlines gen lhr.json /path/to/file.json ../directory/
 ```
 
 You can specify multiple files and directories as inputs.
@@ -61,6 +61,16 @@ Alternatively, you can manually copy the command’s standard output into your c
 
 If you encounter warnings about missing airline callsigns in the standard error output, please consider opening a pull
 request or reporting an issue, if appropriate.
+
+### `flow`
+
+Calculate airport flow of arrivals using fetched flights data.
+
+**Example:**
+
+```sh
+eatc-airlines flow lhr.json /path/to/file.json ../directory/
+```
 
 ## Contributing
 
