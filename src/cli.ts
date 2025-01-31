@@ -128,11 +128,17 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
     }
 }
 
+function timeAgo(date: Date) {
+    const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+    return `${Math.floor(diff / 3600) > 0 ? Math.floor(diff / 3600) + ':' : ''}${Math.floor(diff / 60)}:${(diff % 60).toString().padStart(2, '0')}`;
+}
+
 program.command("fetch")
     .description("Fetch arriving flights from airnavradar.com API.")
     .argument("<icao>", "ICAO code of the airport.")
     .argument("[path]", "Path where the retrieved data will be saved in JSON format. Use a dash ('-') to write to standard output.")
     .option("-c, --concurrency <count>", "Number of requests to send in parallel.", "5")
+    .option("-s, --silent", "Silent mode (no progress indicator).")
     .action(async (a, b, options) => {
         const icao: string = a;
         let location: string = b ?? icao + "-" + (Date.now()/1000).toFixed(0) + ".json";
@@ -140,11 +146,29 @@ program.command("fetch")
         if (Number.isNaN(concurrency) || !Number.isFinite(concurrency))
             program.error("concurrency must be valid integer");
 
-        const flights = new Map<number, Flight>();
+        if (options.silent !== true) process.stderr.write(`Fetching flights for ${icao}…\n`);
 
-        const initial = await get(icao, new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+        const started = new Date();
+        function progress(flights: Map<number, Flight>, started: Date) {
+            if (options.silent) return;
+            const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            const thisWeek = Array.from(flights.values()).filter(f => f.time.getTime() > week.getTime());
+            const averagePerDay = thisWeek.length / new Set(thisWeek.map(f => f.time.toDateString())).size;
+            const oldest = thisWeek.length > 0 ? thisWeek.reduce((f, g) => f.time.getTime() < g.time.getTime() ? f : g).time : null;
+            const remainingDays = ((oldest?.getTime() ?? week.getTime()) - week.getTime()) / (24 * 60 * 60 * 1000);
+            const estimated = Math.round(averagePerDay * remainingDays);
+            const message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString(void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
+            process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.length)));
+        }
+
+        const flights = new Map<number, Flight>();
+        progress(flights, started);
+        const progressInterval = setInterval(() => progress(flights, started), 1000);
+
+        const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000));
         for (const flight of initial.list)
             flights.set(flight.id, flight);
+        progress(flights, started);
         let more = initial.more;
         let t = new Date(initial.oldest.getTime() + 27e5);
         while (more) {
@@ -158,7 +182,10 @@ program.command("fetch")
                 for (const flight of result.list)
                     flights.set(flight.id, flight);
             more = results.every(r => r.more);
+            progress(flights, started);
         }
+        clearInterval(progressInterval);
+        if (options.silent !== true) process.stderr.write("\n");
         const json = JSON.stringify(Array.from(flights.values()));
         if (location === "-") process.stdout.write(json);
         else {
