@@ -1,84 +1,144 @@
 # eatc-airlines
 
-A command-line tool and API for retrieving air traffic data and generating airline configurations for EndlessATC custom
-airspaces.
+A command-line tool and API for retrieving scheduled and historical (up to 7 days) flight data and generating *Endless
+ATC* airline configurations.
+
+## Features
+
+- Fetch scheduled and past flights (up to 7 days) from [AirNav Radar](https://airnavradar.com).
+- Convert flight data into `airlines` configuration for *Endless ATC* custom airspace.
+- Analyse traffic flow statistics from flight data.
+- Simple, fast, and works offline once data is fetched.
+- No API key or authentication required.
+
+---
 
 ## Installation
 
-To use this tool, you must have [Node.js and NPM installed](https://nodejs.org/en/download/).
+### Requirements
 
-Install globally using the following command:
+- [Node.js and NPM](https://nodejs.org/en/download/) (Latest LTS version recommended).
+- A terminal, Command Prompt (cmd.exe), or similar for executing shell commands.
+
+### Install Globally
+
+Use your preferred terminal application to run the following command:
 
 ```sh
 npm install -g eatc-airlines
 ```
 
+### Android Installation (via Termux)
+
+1. Install *Termux*, a terminal emulator for Android:
+   <p>
+
+   [<img src="https://wsrv.nl/?url=https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg&h=45" alt="Get it on Google Play" height="45">](https://play.google.com/store/apps/details?id=com.termux)
+   [<img src="https://wsrv.nl/?url=https://upload.wikimedia.org/wikipedia/commons/a/a3/Get_it_on_F-Droid_%28material_design%29.svg&h=45" alt="Get it on F-Droid" height="45">](https://f-droid.org/packages/com.termux)
+   </p>
+
+2. Install Node.js and NPM:
+   ```sh
+   pkg install nodejs
+   ```
+3. Install `eatc-airlines`:
+   ```sh
+   npm i -g eatc-airlines
+   ```
+
 ### Updating
 
-Stay up to date with the latest callsigns, bug fixes, and new features by updating to the newest version using:
+To update to the latest version:
 
 ```sh
-npm i -g eatc-airlines@latest
+npm install -g eatc-airlines@latest
 ```
+
+---
 
 ## Usage
 
-Once installed, you can use the tool with the following command:
+### Fetching Flight Data
+
+Retrieve scheduled and historical flights (up to 7 days in the past) for a specific airport.
+
+#### Command:
 
 ```sh
-eatc-airlines [options] [command]
+eatc-airlines fetch <icao> [path]
 ```
 
-For detailed help, run `eatc-airlines help`.
+- `<icao>` – **ICAO airport code** (e.g., `EGLL` for Heathrow).
+- `[path]` – *(Optional)* **File path** to save the data. Defaults to a unique file in the current directory.
 
-## Commands
-
-### `fetch`
-
-Fetch flight data for an airport using [AirNav Radar](https://airnavradar.com). This command retrieves flights up to
-approximately 7 days in the past.
-
-**Example:**
+#### Example:
 
 ```sh
-eatc-airlines fetch EGLL lhr.json
+mkdir EGLL && cd EGLL
+eatc-airlines fetch EGLL
 ```
 
-### `gen`
+> [!NOTE]
+> The fetched JSON files should not be manually edited unless you know what you are doing.
 
-After fetching flight data, use this command to generate an `airlines` configuration for your airports in an EndlessATC
-custom airspace.
+---
 
-**Example:**
+### Generating `airlines` Configuration for *Endless ATC*
+
+Convert fetched flight data into an `airlines` configuration for *Endless ATC*.
+
+#### Command:
 
 ```sh
-eatc-airlines gen lhr.json /path/to/file.json ../directory/
+eatc-airlines gen <paths...>
 ```
 
-You can specify multiple files and directories as inputs.
+- `<paths...>` – **One or more JSON files or directories** containing flight data.
 
-Alternatively, you can manually copy the command’s standard output into your custom airspace file.
-
-If you encounter warnings about missing airline callsigns in the standard error output, please consider opening a pull
-request or reporting an issue, if appropriate.
-
-### `flow`
-
-Calculate airport flow of arrivals using fetched flights data.
-
-**Example:**
+#### Example:
 
 ```sh
-eatc-airlines flow lhr.json /path/to/file.json ../directory/
+# Convert all flight data in the current directory
+eatc-airlines gen .
+
+# Convert all files in a specific directory
+eatc-airlines gen ./EGLL
+
+# Convert specific files
+eatc-airlines gen file1.json file2.json
+
+# Save output to a file
+eatc-airlines gen ./EGLL > EGLL-airlines.txt
 ```
+
+---
+
+### Analysing Traffic Flow
+
+Generate basic statistics on traffic flow from fetched flight data.
+
+#### Command:
+
+```sh
+eatc-airlines flow <paths...>
+```
+
+Uses the same arguments as the `gen` command.
+
+#### Example:
+
+```sh
+eatc-airlines flow ./EGLL
+```
+
+---
 
 ## Contributing
 
-This software is free and open-source, licensed under the terms of
-the [GNU General Public License, Version 3](https://www.gnu.org/licenses/gpl-3.0.en.html). Contributions are most
-welcome.
+This project is **free and open-source** under
+the [GNU General Public License, Version 3](https://www.gnu.org/licenses/gpl-3.0.en.html). Contributions are welcome!
 
-For coordination or inquiries, please get in touch via the following channels:
+For inquiries or collaboration, contact:
 
 | Matrix | [@zefir:cloudnode.pro](https://matrix.to/#/@zefir:cloudnode.pro) |
 |--------|------------------------------------------------------------------|
