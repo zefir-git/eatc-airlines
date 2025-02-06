@@ -1,7 +1,7 @@
 {
   "name": "eatc-airlines",
   "version": "0.0.0-dev",
-  "description": "Command-line tool and API for retrieving air traffic data and generating airline configurations for EndlessATC custom airspaces.",
+  "description": "A command-line tool and API for retrieving scheduled and historical flight data and generating Endless ATC airline configurations. ",
   "keywords": [
     "endlessatc",
     "eatc",
