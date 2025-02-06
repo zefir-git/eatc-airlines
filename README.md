@@ -1,6 +1,6 @@
 # eatc-airlines
 
-A command-line tool and API for retrieving scheduled and historical (up to 7 days) flight data and generating *Endless
+A command-line tool and API for retrieving scheduled and historical flight data and generating *Endless
 ATC* airline configurations.
 
 ## Features
