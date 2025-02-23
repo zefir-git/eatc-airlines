@@ -19,7 +19,7 @@ import path from "node:path";
 import url from "node:url";
 import fs from "node:fs/promises";
 import {Command} from "commander";
-import {Flight, Location, Direction} from "./api.js";
+import {Flight, Location, Direction, PHONETIC} from "./api.js";
 
 const PATH = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -354,7 +354,7 @@ program.command("gen")
                 * 0–10 based on number of flights
                 */
                score: number,
-               pronunciation: string | null
+               pronunciation: string
            }[] = [];
 
            // group together flights that are from same airline, type and direction
@@ -369,10 +369,19 @@ program.command("gen")
                    existing.direction.add(direction);
                }
                else {
-                   const pronunciation = callsigns.get(flight.airline!.toUpperCase()) ?? null;
+                   const pronunciation = callsigns.get(flight.airline!.toUpperCase())
+                       ?? null;
                    if (!flight.airline!.includes("-") && pronunciation === null)
                        process.stderr.write(`WARNING! ${flight.airline}: no pronunciation available\n`);
-                   merged.push({airline: flight.airline!, type: new Set([flight.type]), direction: new Set([direction]), flights: [flight], score: NaN, pronunciation});
+                   merged.push({
+                       airline: flight.airline!,
+                       type: new Set([flight.type]),
+                       direction: new Set([direction]),
+                       flights: [flight],
+                       score: NaN,
+                       pronunciation: pronunciation ?? flight.airline!
+                           .toUpperCase().split("")
+                           .map(c => PHONETIC[c as keyof typeof PHONETIC] ?? c).join(" ")});
                }
            }
 
