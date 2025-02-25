@@ -93,7 +93,7 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
     url.searchParams.set("key", "mrgapdstic");
     url.searchParams.set("max", (t.getTime() / 1000).toFixed(0));
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`$ returned ${res.status} (${res.statusText})`);
+    if (!res.ok) throw new Error(`API returned ${res.status} (${res.statusText}) for ${url}`);
     const body = await res.text();
     try {
         const json: {list: Record<string, string | number | boolean | null>[], hasEarlier: boolean} = JSON.parse(body);
@@ -104,14 +104,14 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
             if (typeof flight.fid !== "number") continue;
             const id = flight.fid;
             // actual, estimated, scheduled
-            if (typeof (flight.arrau ?? flight.arreu ?? flight.arrsu) !== "number") continue;
-            const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu) as number * 1000);
+            if (typeof (flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) !== "number") continue;
+            const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) as number * 1000);
             if (flight.acr !== null && typeof flight.acr !== "string") continue;
             const tail = flight.acr;
             if (typeof flight.act !== "string" || flight.act === "GRND") continue;
             const type = flight.act;
-            if (flight.csalic !== null && typeof flight.csalic !== "string") continue;
-            const airline = flight.csalic;
+            if (flight.csalic !== null && flight.csalic !== undefined && typeof flight.csalic !== "string") continue;
+            const airline = flight.csalic ?? null;
             if ((flight.cs ?? flight.fnic ?? flight.ectlcs) !== null && typeof (flight.cs ?? flight.fnic ?? flight.ectlcs) !== "string") continue;
             const callsign = (flight.cs ?? flight.fnic ?? flight.ectlcs) as string | null;
             if (typeof flight.apdstic !== "string" || typeof flight.apdstla !== "number" || typeof flight.apdstlo !== "number") continue;
