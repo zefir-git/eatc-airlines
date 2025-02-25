@@ -354,7 +354,7 @@ program.command("gen")
                 * 0–10 based on number of flights
                 */
                score: number,
-               pronunciation: string
+               pronunciation: string | null
            }[] = [];
 
            // group together flights that are from same airline, type and direction
@@ -369,9 +369,12 @@ program.command("gen")
                    existing.direction.add(direction);
                }
                else {
-                   const pronunciation = callsigns.get(flight.airline!.toUpperCase())
-                       ?? null;
-                   if (!flight.airline!.includes("-") && pronunciation === null)
+                   const pronunciation = flight.airline === null || flight.airline.includes("-")
+                       ? null
+                       : callsigns.get(flight.airline.toUpperCase())
+                       ?? flight.airline.toUpperCase().split("")
+                           .map(c => PHONETIC[c as keyof typeof PHONETIC] ?? c).join(" ");
+                   if (pronunciation !== null && !Array.from(callsigns.values()).includes(pronunciation))
                        process.stderr.write(`WARNING! ${flight.airline}: no pronunciation available\n`);
                    merged.push({
                        airline: flight.airline!,
@@ -379,9 +382,8 @@ program.command("gen")
                        direction: new Set([direction]),
                        flights: [flight],
                        score: NaN,
-                       pronunciation: pronunciation ?? flight.airline!
-                           .toUpperCase().split("")
-                           .map(c => PHONETIC[c as keyof typeof PHONETIC] ?? c).join(" ")});
+                       pronunciation
+                   });
                }
            }
 
