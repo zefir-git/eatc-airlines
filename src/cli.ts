@@ -93,7 +93,7 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
     url.searchParams.set("key", "mrgapdstic");
     url.searchParams.set("max", (t.getTime() / 1000).toFixed(0));
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`$ returned ${res.status} (${res.statusText})`);
+    if (!res.ok) throw new Error(`API returned ${res.status} (${res.statusText}) for ${url}`);
     const body = await res.text();
     try {
         const json: {list: Record<string, string | number | boolean | null>[], hasEarlier: boolean} = JSON.parse(body);
