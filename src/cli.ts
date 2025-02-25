@@ -104,8 +104,8 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
             if (typeof flight.fid !== "number") continue;
             const id = flight.fid;
             // actual, estimated, scheduled
-            if (typeof (flight.arrau ?? flight.arreu ?? flight.arrsu) !== "number") continue;
-            const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu) as number * 1000);
+            if (typeof (flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) !== "number") continue;
+            const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) as number * 1000);
             if (flight.acr !== null && typeof flight.acr !== "string") continue;
             const tail = flight.acr;
             if (typeof flight.act !== "string" || flight.act === "GRND") continue;
