@@ -110,8 +110,8 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
             const tail = flight.acr;
             if (typeof flight.act !== "string" || flight.act === "GRND") continue;
             const type = flight.act;
-            if (flight.csalic !== null && typeof flight.csalic !== "string") continue;
-            const airline = flight.csalic;
+            if (flight.csalic !== null && flight.csalic !== undefined && typeof flight.csalic !== "string") continue;
+            const airline = flight.csalic ?? null;
             if ((flight.cs ?? flight.fnic ?? flight.ectlcs) !== null && typeof (flight.cs ?? flight.fnic ?? flight.ectlcs) !== "string") continue;
             const callsign = (flight.cs ?? flight.fnic ?? flight.ectlcs) as string | null;
             if (typeof flight.apdstic !== "string" || typeof flight.apdstla !== "number" || typeof flight.apdstlo !== "number") continue;
