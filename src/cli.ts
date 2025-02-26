@@ -108,7 +108,7 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
             const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) as number * 1000);
             if (flight.acr !== null && typeof flight.acr !== "string") continue;
             const tail = flight.acr;
-            if (typeof flight.act !== "string" || flight.act === "GRND") continue;
+            if (typeof flight.act !== "string" || flight.act === "GRND" || flight.act.toLowerCase() === "zzzz") continue;
             const type = flight.act;
             if (flight.csalic !== null && flight.csalic !== undefined && typeof flight.csalic !== "string") continue;
             const airline = flight.csalic ?? null;
