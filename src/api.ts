@@ -266,3 +266,16 @@ export const PHONETIC = {
     Y: "Yankee",
     Z: "Zulu",
 } as const;
+
+export const NUMBERS = {
+    0: "Zero",
+    1: "One",
+    2: "Two",
+    3: "Three",
+    4: "Four",
+    5: "Five",
+    6: "Six",
+    7: "Seven",
+    8: "Eight",
+    9: "Niner",
+} as const;
