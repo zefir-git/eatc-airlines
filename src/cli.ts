@@ -265,7 +265,7 @@ program.command("gen")
 
            // remove invalid flights or try to fill data
            const helicopters = new Set<string>(JSON.parse(await fs.readFile(path.join(PATH, "..", "data", "helicopters.json"), "utf-8")));
-           for (const [id, flight] of flights) {
+           for (let [id, flight] of flights) {
                if (
                    helicopters.has(flight.type.toUpperCase())
                    || (flight.airline === null && flight.callsign === null)
@@ -273,6 +273,20 @@ program.command("gen")
                ) {
                    flights.delete(id);
                    continue;
+               }
+
+               // bogus callsign
+               if (flight.callsign !== null && flight.callsign.length <= 3) {
+                   flights.set(id, flight = new Flight(
+                       flight.id,
+                       flight.time,
+                       flight.tail,
+                       flight.type,
+                       flight.airline,
+                       null,
+                       flight.to,
+                       flight.from
+                   ));
                }
 
                if (flight.callsign !== null && (flight.airline === "{PVT}" || flight.airline === null)) {
