@@ -19,7 +19,7 @@ import path from "node:path";
 import url from "node:url";
 import fs from "node:fs/promises";
 import {Command} from "commander";
-import {Flight, Location, Direction, PHONETIC} from "./api.js";
+import {Flight, Location, Direction, PHONETIC, NUMBERS} from "./api.js";
 
 const PATH = path.dirname(url.fileURLToPath(import.meta.url));
 
@@ -108,10 +108,13 @@ async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolea
             const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) as number * 1000);
             if (flight.acr !== null && typeof flight.acr !== "string") continue;
             const tail = flight.acr;
-            if (typeof flight.act !== "string" || flight.act === "GRND") continue;
+            if (typeof flight.act !== "string" || flight.act === "GRND" || flight.act.toLowerCase() === "zzzz") continue;
             const type = flight.act;
-            if (flight.csalic !== null && flight.csalic !== undefined && typeof flight.csalic !== "string") continue;
-            const airline = flight.csalic ?? null;
+            if (
+                ((flight.csalic === undefined ? flight.alic : flight.csalic) ?? null) !== null
+                && typeof (flight.csalic === undefined ? flight.alic : flight.csalic) !== "string"
+            ) continue;
+            const airline = ((flight.csalic === undefined ? flight.alic : flight.csalic) ?? null) as string | null;
             if ((flight.cs ?? flight.fnic ?? flight.ectlcs) !== null && typeof (flight.cs ?? flight.fnic ?? flight.ectlcs) !== "string") continue;
             const callsign = (flight.cs ?? flight.fnic ?? flight.ectlcs) as string | null;
             if (typeof flight.apdstic !== "string" || typeof flight.apdstla !== "number" || typeof flight.apdstlo !== "number") continue;
@@ -343,6 +346,20 @@ program.command("gen")
                        new Location(flight.from.name, flight.from.lat, flight.from.lon),
                    ));
                }
+
+               // if there is an airline and the callsign start with more than 3 letters
+               else if (flight.callsign !== null && /^[A-Z]{4,}/.test(flight.callsign.toUpperCase())) {
+                   flights.set(id, new Flight(
+                       flight.id,
+                       flight.time,
+                       flight.tail,
+                       flight.type,
+                       flight.callsign.toUpperCase().replace(/[^A-Z\d]/g, "") + "-",
+                       flight.callsign,
+                       flight.to,
+                       flight.from,
+                   ));
+               }
            }
 
            const merged: {
@@ -369,12 +386,20 @@ program.command("gen")
                    existing.direction.add(direction);
                }
                else {
-                   const pronunciation = flight.airline === null || flight.airline.includes("-")
-                       ? null
-                       : callsigns.get(flight.airline.toUpperCase())
-                       ?? flight.airline.toUpperCase().split("")
-                           .map(c => PHONETIC[c as keyof typeof PHONETIC] ?? c).join(" ");
-                   if (pronunciation !== null && !Array.from(callsigns.values()).includes(pronunciation))
+                   let pronunciation: string | null;
+                   if (flight.airline !== null && flight.airline.endsWith("-")) {
+                       pronunciation = flight.airline.slice(0, -1);
+                       for (const [number, value] of Object.entries(NUMBERS))
+                           pronunciation = pronunciation.replaceAll(number, ` ${value} `);
+                       pronunciation = pronunciation.trim().replace(/\s+/g, " ").toLowerCase();
+                   }
+                   else if (flight.airline === null || flight.airline.includes("-"))
+                       pronunciation = null;
+                   else
+                       pronunciation = callsigns.get(flight.airline.toUpperCase())
+                           ?? flight.airline.toUpperCase().split("")
+                               .map(c => PHONETIC[c as keyof typeof PHONETIC] ?? c).join(" ");
+                   if (pronunciation !== null && !flight.airline?.endsWith("-") && !Array.from(callsigns.values()).includes(pronunciation))
                        process.stderr.write(`WARNING! ${flight.airline}: no pronunciation available\n`);
                    merged.push({
                        airline: flight.airline!,
