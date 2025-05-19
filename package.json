@@ -36,6 +36,6 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "commander": "^13.0.0"
+    "commander": "^14.0.0"
   }
 }
