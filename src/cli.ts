@@ -211,7 +211,7 @@ program.command("fetch")
        .option("-c, --concurrency <count>", "Number of requests to send in parallel.", "5")
        .option("-s, --silent", "Silent mode (no progress indicator).")
        .option("-u, --user-agent <name>", "User string to send to the API.")
-       .option("-C, --cloudflare", "Cloudflare clearance cookie to send to the API.")
+       .option("-C, --cloudflare <cookie>", "Cloudflare clearance cookie to send to the API.")
        .action(async (a, b, options) => {
            const icao: string = a;
            let location: string = b ?? icao + "-" + (Date.now() / 1000).toFixed(0) + ".json";
@@ -239,7 +239,6 @@ program.command("fetch")
            progress(flights, started);
            const progressInterval = setInterval(() => progress(flights, started), 1000);
 
-           console.log(options);
            const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), options.userAgent, options.cloudflare);
            for (const flight of initial.list)
                flights.set(flight.id, flight);
