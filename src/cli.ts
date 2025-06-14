@@ -88,11 +88,22 @@ program
     .helpOption("-h, --help", "Display help for command.")
     .helpCommand("help [command]", "Display help for command.");
 
-async function get(icao: string, t: Date): Promise<{list: Flight[], more: boolean, oldest: Date}> {
+async function get(icao: string, t: Date, ua?: string, cf?: string): Promise<{list: Flight[], more: boolean, oldest: Date}> {
     const url = new URL(icao, "https://www.airnavradar.com/data/airports/search/");
     url.searchParams.set("key", "mrgapdstic");
     url.searchParams.set("max", (t.getTime() / 1000).toFixed(0));
-    const res = await fetch(url);
+
+    const requestHeaders = new Headers();
+    if (ua !== undefined)
+        requestHeaders.set("User-Agent", ua);
+    if (cf !== undefined)
+        requestHeaders.set("Cookie", "cf_clearance=" + cf);
+
+    const res = await fetch(url, {
+        method: "GET",
+        headers: requestHeaders,
+        credentials: "include",
+    });
     if (!res.ok) throw new Error(`API returned ${res.status} (${res.statusText}) for ${url}`);
     const body = await res.text();
     try {
@@ -199,6 +210,8 @@ program.command("fetch")
        .argument("[path]", "Path where the retrieved data will be saved in JSON format. Use a dash ('-') to write to standard output.")
        .option("-c, --concurrency <count>", "Number of requests to send in parallel.", "5")
        .option("-s, --silent", "Silent mode (no progress indicator).")
+       .option("-u, --user-agent <name>", "User string to send to the API.")
+       .option("-C, --cloudflare", "Cloudflare clearance cookie to send to the API.")
        .action(async (a, b, options) => {
            const icao: string = a;
            let location: string = b ?? icao + "-" + (Date.now() / 1000).toFixed(0) + ".json";
@@ -226,7 +239,8 @@ program.command("fetch")
            progress(flights, started);
            const progressInterval = setInterval(() => progress(flights, started), 1000);
 
-           const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000));
+           console.log(options);
+           const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), options.userAgent, options.cloudflare);
            for (const flight of initial.list)
                flights.set(flight.id, flight);
            progress(flights, started);
@@ -235,7 +249,7 @@ program.command("fetch")
            while (more) {
                const promises: ReturnType<typeof get>[] = [];
                for (let i = 0; i < concurrency; ++i) {
-                   promises.push(get(icao, new Date(t)));
+                   promises.push(get(icao, new Date(t), options.userAgent, options.cloudflare));
                    t = new Date(t.getTime() - 27e5);
                }
                const results = await Promise.all(promises);
