@@ -406,7 +406,7 @@ program.command("gen")
 
                    // Assuming airline callsign
                    // (if it doesn’t start with 3 letters… ¯\_(ツ)_/¯)
-                   if (/^[A-Z]{3}\d[A-Z\d]{0,3}$/.test(flight.callsign)) {
+                   if (!/^[A-Z]{3}\d[A-Z\d]{0,3}$/.test(flight.callsign)) {
                        flights.delete(id);
                        continue;
                    }
