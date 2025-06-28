@@ -431,6 +431,7 @@ program.command("gen")
                m.score = (m.flights.length / maxFlights) * 10;
 
            process.stdout.write(merged
+                   .filter(m => m.score >= 0.005)
                    // sort by score descending
                    .sort((a, b) => b.score - a.score)
                    .map(entry => {
