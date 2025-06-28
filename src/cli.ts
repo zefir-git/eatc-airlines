@@ -106,7 +106,14 @@ async function get(icao: string, t: Date, ua?: string, cf?: string, session?: st
         headers: requestHeaders,
         credentials: "include",
     });
-    if (!res.ok) throw new Error(`API returned ${res.status} (${res.statusText}) for ${url}`);
+    if (!res.ok) {
+        if (
+            res.status === 403
+            && res.headers.get("content-type") !== "application/json"
+        )
+            console.log("\x1b[0;33mYou are likely facing a Cloudflare challenge. Please see \x1b[1;33m\x1b]8;;https://github.com/zefir-git/eatc-airlines/pull/52#issue-3145483139\x1b\\#52\x1b]8;;\x1b\\\x1b[0;33m on how to resolve it.\x1b[0m");
+        throw new Error(`API returned ${res.status} (${res.statusText}) for ${url}`);
+    }
     const body = await res.text();
     try {
         const json: {list: Record<string, string | number | boolean | null>[], hasEarlier: boolean} = JSON.parse(body);
