@@ -250,7 +250,7 @@ program.command("fetch")
                        weekday: "short",
                        month: "short",
                        year: "numeric",
-                   })} \x1b[2mEstinamtion of remaining not possible.\x1b[0m`;
+                   })} \x1b[2mEstimation of remaining flights not possible.\x1b[0m`;
                }
                else {
                    const thisWeek = allFlights.filter(f => f.time.getTime() >= week.getTime());
