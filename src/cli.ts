@@ -228,13 +228,29 @@ program.command("fetch")
 
            function progress(flights: Map<number, Flight>, started: Date) {
                if (options.silent) return;
-               const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-               const thisWeek = Array.from(flights.values()).filter(f => f.time.getTime() > week.getTime());
-               const averagePerDay = thisWeek.length / new Set(thisWeek.map(f => f.time.toDateString())).size;
-               const oldest = thisWeek.length > 0 ? thisWeek.reduce((f, g) => f.time.getTime() < g.time.getTime() ? f : g).time : null;
-               const remainingDays = ((oldest?.getTime() ?? week.getTime()) - week.getTime()) / (24 * 60 * 60 * 1000);
-               const estimated = Math.round(averagePerDay * remainingDays);
-               const message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString(void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
+
+               const week = new Date(started.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+               const allFlights = Array.from(flights.values());
+               const older = allFlights.slice(-concurrency * 30);
+               const oldest = older.length > 0 ? older.reduce((f, g) => f.time.getTime() < g.time.getTime() ? f : g).time : null;
+
+               let message: string;
+               if (oldest !== null && oldest.getTime() < week.getTime()) {
+                   message = `\r[${timeAgo(started)}] Fetched: ${flights.size}. Oldest flight: ${oldest.toLocaleDateString(void 0, {
+                       day: "numeric",
+                       weekday: "short",
+                       month: "short",
+                       year: "numeric",
+                   })} \x1b[2mEstinamtion of remaining not possible.\x1b[0m`;
+               }
+               else {
+                   const thisWeek = allFlights.filter(f => f.time.getTime() >= week.getTime());
+                   const averagePerDay = thisWeek.length / new Set(thisWeek.map(f => f.time.toDateString())).size;
+                   const remainingDays = ((oldest?.getTime() ?? week.getTime()) - week.getTime()) / (24 * 60 * 60 * 1000);
+                   const estimated = Math.round(averagePerDay * remainingDays);
+                   message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString( void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
+               }
                process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.length)));
            }
 
