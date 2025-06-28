@@ -325,6 +325,7 @@ program.command("fetch")
                    await fs.writeFile(location, JSON.stringify(Array.from(flights.values())));
            }
 
+           clearInterval(progressInterval);
            if (options.silent !== true) process.stderr.write("\n");
            process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.\nWriting to ${location}…`);
            await finalSave();
