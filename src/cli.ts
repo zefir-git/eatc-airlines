@@ -264,28 +264,63 @@ program.command("fetch")
            progress(flights, started);
            let more = initial.more;
            let t = new Date(initial.oldest.getTime() + 27e5);
+
+           process.once("SIGINT", async () => {
+               clearInterval(progressInterval);
+               if (options.silent !== true) process.stderr.write("\n");
+               if (location !== "-")
+                   process.stdout.write(`SIGINT received, saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
+               await finalSave();
+               process.exit(0);
+           });
+
+
+
+           async function finalSave() {
+               const json = JSON.stringify(Array.from(flights.values()));
+               if (location === "-") process.stdout.write(json);
+               else {
+                   await fs.writeFile(location, json);
+                   process.stdout.write(`\r\nWritten to ${location}.\n`);
+               }
+           }
+
            while (more) {
                const promises: ReturnType<typeof get>[] = [];
                for (let i = 0; i < concurrency; ++i) {
                    promises.push(get(icao, new Date(t), options.userAgent, options.cloudflare, options.session));
                    t = new Date(t.getTime() - 27e5);
                }
-               const results = await Promise.all(promises);
-               for (const result of results)
-                   for (const flight of result.list)
+               const results = await Promise.allSettled(promises);
+               let error: Error | null = null;
+               for (const result of results) {
+                   if (result.status === "rejected") {
+                       error = result.reason;
+                       break;
+                   }
+                   for (const flight of result.value.list)
                        flights.set(flight.id, flight);
-               more = results.every(r => r.more);
+               }
+               if (error !== null) {
+                   clearInterval(progressInterval);
+                   if (options.silent !== true) process.stderr.write("\n");
+                   console.log(error);
+                   if (location !== "-") {
+                       process.stdout.write(`Saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
+                   }
+                   await finalSave();
+                   return;
+               }
+               more = results.filter(r => r.status === "fulfilled").every(r => r.value.more);
                progress(flights, started);
+
+               if (location !== "-")
+                   await fs.writeFile(location, JSON.stringify(Array.from(flights.values())));
            }
-           clearInterval(progressInterval);
+
            if (options.silent !== true) process.stderr.write("\n");
-           const json = JSON.stringify(Array.from(flights.values()));
-           if (location === "-") process.stdout.write(json);
-           else {
-               process.stdout.write(`Fetched ${flights.size} flights.\nWriting to ${location}…`);
-               await fs.writeFile(location, json);
-               process.stdout.write(`\rWritten to ${location} \n`);
-           }
+           process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.\nWriting to ${location}…`);
+           await finalSave();
        });
 
 program.command("gen")
