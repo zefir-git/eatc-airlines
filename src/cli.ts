@@ -492,10 +492,11 @@ program.command("gen")
            // calculate score
            const maxFlights = Math.max(...merged.map(m => m.flights.length));
            for (const m of merged)
-               m.score = (m.flights.length / maxFlights) * 10;
+               m.score = Math.round((m.flights.length / maxFlights) * 1000) / 100;
 
            process.stdout.write(merged
-                   // sort by score descending
+                   .filter(m => m.score >= 0.005)
+                   .sort((a, b) => a.airline.localeCompare(b.airline))
                    .sort((a, b) => b.score - a.score)
                    .map(entry => {
                        return "\t" +
