@@ -258,7 +258,7 @@ program.command("fetch")
                    const estimated = Math.round(averagePerDay * remainingDays);
                    message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString( void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
                }
-               process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.length)));
+               process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").length)));
            }
 
            const flights = new Map<number, Flight>();
