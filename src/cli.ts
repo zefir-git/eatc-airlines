@@ -88,7 +88,7 @@ program
     .helpOption("-h, --help", "Display help for command.")
     .helpCommand("help [command]", "Display help for command.");
 
-async function get(icao: string, t: Date, ua?: string, cf?: string): Promise<{list: Flight[], more: boolean, oldest: Date}> {
+async function get(icao: string, t: Date, ua?: string, cf?: string, session?: string): Promise<{list: Flight[], more: boolean, oldest: Date}> {
     const url = new URL(icao, "https://www.airnavradar.com/data/airports/search/");
     url.searchParams.set("key", "mrgapdstic");
     url.searchParams.set("max", (t.getTime() / 1000).toFixed(0));
@@ -97,14 +97,24 @@ async function get(icao: string, t: Date, ua?: string, cf?: string): Promise<{li
     if (ua !== undefined)
         requestHeaders.set("User-Agent", ua);
     if (cf !== undefined)
-        requestHeaders.set("Cookie", "cf_clearance=" + cf);
+        requestHeaders.append("Cookie", "cf_clearance=" + cf);
+    if (session !== undefined)
+        requestHeaders.append("Cookie", "rb_session=" + session);
 
     const res = await fetch(url, {
         method: "GET",
         headers: requestHeaders,
         credentials: "include",
     });
-    if (!res.ok) throw new Error(`API returned ${res.status} (${res.statusText}) for ${url}`);
+    if (!res.ok) {
+        if (
+            res.status === 403
+            && res.headers.get("content-type") !== "application/json"
+        )
+            console.warn("\r\n\x1b[0;33mYou are likely facing a Cloudflare challenge. Please see \x1b[1;33m\x1b]8;;https://github.com/zefir-git/eatc-airlines/pull/52#issue-3145483139\x1b\\#52\x1b]8;;\x1b\\\x1b[0;33m on how to resolve it.\x1b[0m");
+        console.error(new Error(`API returned ${res.status} (${res.statusText}) for ${url}`));
+        process.exit(1);
+    }
     const body = await res.text();
     try {
         const json: {list: Record<string, string | number | boolean | null>[], hasEarlier: boolean} = JSON.parse(body);
@@ -210,8 +220,9 @@ program.command("fetch")
        .argument("[path]", "Path where the retrieved data will be saved in JSON format. Use a dash ('-') to write to standard output.")
        .option("-c, --concurrency <count>", "Number of requests to send in parallel.", "5")
        .option("-s, --silent", "Silent mode (no progress indicator).")
-       .option("-u, --user-agent <name>", "User string to send to the API.")
+       .option("-u, --user-agent <name>", "User agent string to send to the API.")
        .option("-C, --cloudflare <cookie>", "Cloudflare clearance cookie to send to the API.")
+       .option("-S, --session <cookie>", "AirNav Radar session cookie for extended flights history.")
        .action(async (a, b, options) => {
            const icao: string = a;
            let location: string = b ?? icao + "-" + (Date.now() / 1000).toFixed(0) + ".json";
@@ -225,48 +236,100 @@ program.command("fetch")
 
            function progress(flights: Map<number, Flight>, started: Date) {
                if (options.silent) return;
-               const week = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-               const thisWeek = Array.from(flights.values()).filter(f => f.time.getTime() > week.getTime());
-               const averagePerDay = thisWeek.length / new Set(thisWeek.map(f => f.time.toDateString())).size;
-               const oldest = thisWeek.length > 0 ? thisWeek.reduce((f, g) => f.time.getTime() < g.time.getTime() ? f : g).time : null;
-               const remainingDays = ((oldest?.getTime() ?? week.getTime()) - week.getTime()) / (24 * 60 * 60 * 1000);
-               const estimated = Math.round(averagePerDay * remainingDays);
-               const message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString(void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
-               process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.length)));
+
+               const week = new Date(started.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+               const allFlights = Array.from(flights.values());
+               const older = allFlights.slice(-concurrency * 30);
+               const oldest = older.length > 0 ? older.reduce((f, g) => f.time.getTime() < g.time.getTime() ? f : g).time : null;
+
+               let message: string;
+               if (oldest !== null && oldest.getTime() < week.getTime()) {
+                   message = `\r[${timeAgo(started)}] Fetched: ${flights.size}. Oldest flight: ${oldest.toLocaleDateString(void 0, {
+                       day: "numeric",
+                       weekday: "short",
+                       month: "short",
+                       year: "numeric",
+                   })} \x1b[2mEstinamtion of remaining not possible.\x1b[0m`;
+               }
+               else {
+                   const thisWeek = allFlights.filter(f => f.time.getTime() >= week.getTime());
+                   const averagePerDay = thisWeek.length / new Set(thisWeek.map(f => f.time.toDateString())).size;
+                   const remainingDays = ((oldest?.getTime() ?? week.getTime()) - week.getTime()) / (24 * 60 * 60 * 1000);
+                   const estimated = Math.round(averagePerDay * remainingDays);
+                   message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString( void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
+               }
+               process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").length)));
            }
 
            const flights = new Map<number, Flight>();
            progress(flights, started);
            const progressInterval = setInterval(() => progress(flights, started), 1000);
 
-           const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), options.userAgent, options.cloudflare);
+           const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), options.userAgent, options.cloudflare, options.session);
            for (const flight of initial.list)
                flights.set(flight.id, flight);
            progress(flights, started);
            let more = initial.more;
            let t = new Date(initial.oldest.getTime() + 27e5);
+
+           process.once("SIGINT", async () => {
+               clearInterval(progressInterval);
+               if (options.silent !== true) process.stderr.write("\n");
+               if (location !== "-")
+                   process.stdout.write(`SIGINT received, saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
+               await finalSave();
+               process.exit(0);
+           });
+
+
+
+           async function finalSave() {
+               const json = JSON.stringify(Array.from(flights.values()));
+               if (location === "-") process.stdout.write(json);
+               else {
+                   await fs.writeFile(location, json);
+                   process.stdout.write(`\r\nWritten to ${location}.\n`);
+               }
+           }
+
            while (more) {
                const promises: ReturnType<typeof get>[] = [];
                for (let i = 0; i < concurrency; ++i) {
-                   promises.push(get(icao, new Date(t), options.userAgent, options.cloudflare));
+                   promises.push(get(icao, new Date(t), options.userAgent, options.cloudflare, options.session));
                    t = new Date(t.getTime() - 27e5);
                }
-               const results = await Promise.all(promises);
-               for (const result of results)
-                   for (const flight of result.list)
+               const results = await Promise.allSettled(promises);
+               let error: Error | null = null;
+               for (const result of results) {
+                   if (result.status === "rejected") {
+                       error = result.reason;
+                       break;
+                   }
+                   for (const flight of result.value.list)
                        flights.set(flight.id, flight);
-               more = results.every(r => r.more);
+               }
+               if (error !== null) {
+                   clearInterval(progressInterval);
+                   if (options.silent !== true) process.stderr.write("\n");
+                   console.log(error);
+                   if (location !== "-") {
+                       process.stdout.write(`Saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
+                   }
+                   await finalSave();
+                   return;
+               }
+               more = results.filter(r => r.status === "fulfilled").every(r => r.value.more);
                progress(flights, started);
+
+               if (location !== "-")
+                   await fs.writeFile(location, JSON.stringify(Array.from(flights.values())));
            }
+
            clearInterval(progressInterval);
            if (options.silent !== true) process.stderr.write("\n");
-           const json = JSON.stringify(Array.from(flights.values()));
-           if (location === "-") process.stdout.write(json);
-           else {
-               process.stdout.write(`Fetched ${flights.size} flights.\nWriting to ${location}…`);
-               await fs.writeFile(location, json);
-               process.stdout.write(`\rWritten to ${location} \n`);
-           }
+           process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.\nWriting to ${location}…`);
+           await finalSave();
        });
 
 program.command("gen")
