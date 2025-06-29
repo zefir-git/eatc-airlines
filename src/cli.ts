@@ -351,62 +351,63 @@ program.command("gen")
                    continue;
                }
 
-               if (flight.callsign !== null && (flight.airline === "{PVT}" || flight.airline === null)) {
-                   // Regional registrations
-                   if (flight.tail !== null) {
-                       /**
-                        * Regular expressions for areas with odd registration formats
-                        * [expression, number of characters that are part of area code]
-                        */
-                       const regexes: [RegExp, number][] = [
-                           [/^N\d{1,5}[A-Z]{0,2}$/, 1], // US (N)
-                           [/^HI\d{3}([A-Z]{2}|\d)?$/, 2], // DO (HI)
-                           [/^JA(\d{4}|\d{3}[A-Z]|\d{2}[A-Z]{2})$/, 2], // JP (JA)
-                           [/^HL\d{4}$/, 2], // KR (HL)
-                           [/^UR\d{5}$/, 2], // UA (UR)
-                           [/^UK\d{5}$/, 2], // UZ (UK)
-                           [/^YV\d{3}(\d|T|E)$/, 2], // VE (YV)
-                           [/^C-[FGI][A-Z]{3}$/, 3], // CA (C-F, C-G, C-I)
-                           [/^7T-([VW])[A-Z]{2}$/, 4], // Algeria Civilian (7T-V 7T-W)
-                           [/^V[PQ]-B[A-Z]{2}$/, 4], // Bermuda (VP-B VQ-B)
-                           [/^VP-L[A-Z]{2}$/, 4], // British Virgin Islands (VP-L)
-                           [/^V[PQ]-C[A-Z]{2}$/, 4], // Cayman Islands (VP-C VQ-C)
-                           [/^CU-[ACHNTU]1\d{4}$/, 5], // Cuba (CU-A1 CU-C1 CU-H1 CU-N1 CU-T1 CU-U1)
-                       ];
-                       const match = regexes.find(([regex]) => regex.test(flight.callsign!)) ?? null;
-                       if (match !== null) {
-                           flights.set(id, new Flight(
-                               flight.id,
-                               flight.time,
-                               flight.tail,
-                               flight.type,
-                               tailToCallsign(flight.tail.slice(0, match[1]).replaceAll("-", ""), flight.tail.slice(match[1])),
-                               flight.callsign,
-                               new Location(flight.to.name, flight.to.lat, flight.to.lon),
-                               new Location(flight.from.name, flight.from.lat, flight.from.lon),
-                           ));
-                           continue;
-                       }
 
-                       // Registrations with a dash (e.g. AB-123CD)
-                       if (flight.tail.replace("-", "").toUpperCase() === flight.callsign.replace("-", "").toUpperCase()) {
-                           flights.set(id, new Flight(
-                               flight.id,
-                               flight.time,
-                               flight.tail,
-                               flight.type,
-                               tailToCallsign(flight.tail.slice(0, flight.tail.indexOf("-")), flight.tail.slice(flight.tail.indexOf("-") + 1)),
-                               flight.callsign,
-                               new Location(flight.to.name, flight.to.lat, flight.to.lon),
-                               new Location(flight.from.name, flight.from.lat, flight.from.lon),
-                           ));
-                           continue;
-                       }
+               // Regional registrations
+               if (flight.tail !== null && flight.callsign !== null) {
+                   /**
+                    * Regular expressions for areas with odd registration formats
+                    * [expression, number of characters that are part of area code]
+                    */
+                   const regexes: [RegExp, number][] = [
+                       [/^N\d{1,5}[A-Z]{0,2}$/, 1], // US (N)
+                       [/^HI\d{3}([A-Z]{2}|\d)?$/, 2], // DO (HI)
+                       [/^JA(\d{4}|\d{3}[A-Z]|\d{2}[A-Z]{2})$/, 2], // JP (JA)
+                       [/^HL\d{4}$/, 2], // KR (HL)
+                       [/^UR\d{5}$/, 2], // UA (UR)
+                       [/^UK\d{5}$/, 2], // UZ (UK)
+                       [/^YV\d{3}(\d|T|E)$/, 2], // VE (YV)
+                       [/^C-[FGI][A-Z]{3}$/, 3], // CA (C-F, C-G, C-I)
+                       [/^7T-([VW])[A-Z]{2}$/, 4], // Algeria Civilian (7T-V 7T-W)
+                       [/^V[PQ]-B[A-Z]{2}$/, 4], // Bermuda (VP-B VQ-B)
+                       [/^VP-L[A-Z]{2}$/, 4], // British Virgin Islands (VP-L)
+                       [/^V[PQ]-C[A-Z]{2}$/, 4], // Cayman Islands (VP-C VQ-C)
+                       [/^CU-[ACHNTU]1\d{4}$/, 5], // Cuba (CU-A1 CU-C1 CU-H1 CU-N1 CU-T1 CU-U1)
+                   ];
+                   const match = regexes.find(([regex]) => regex.test(flight.callsign!)) ?? null;
+                   if (match !== null) {
+                       flights.set(id, new Flight(
+                           flight.id,
+                           flight.time,
+                           flight.tail,
+                           flight.type,
+                           tailToCallsign(flight.tail.slice(0, match[1]).replaceAll("-", ""), flight.tail.slice(match[1])),
+                           flight.callsign,
+                           new Location(flight.to.name, flight.to.lat, flight.to.lon),
+                           new Location(flight.from.name, flight.from.lat, flight.from.lon),
+                       ));
+                       continue;
                    }
 
+                   // Registrations with a dash (e.g. AB-123CD)
+                   if (flight.tail.replace("-", "").toUpperCase() === flight.callsign.replace("-", "").toUpperCase()) {
+                       flights.set(id, new Flight(
+                           flight.id,
+                           flight.time,
+                           flight.tail,
+                           flight.type,
+                           tailToCallsign(flight.tail.slice(0, flight.tail.indexOf("-")), flight.tail.slice(flight.tail.indexOf("-") + 1)),
+                           flight.callsign,
+                           new Location(flight.to.name, flight.to.lat, flight.to.lon),
+                           new Location(flight.from.name, flight.from.lat, flight.from.lon),
+                       ));
+                       continue;
+                   }
+               }
+
+               if (flight.callsign !== null && (flight.airline === "{PVT}" || flight.airline === null)) {
                    // Assuming airline callsign
                    // (if it doesn’t start with 3 letters… ¯\_(ツ)_/¯)
-                   if (/^[A-Z]{3}\d[A-Z\d]{0,3}$/.test(flight.callsign)) {
+                   if (!/^[A-Z]{3}\d[A-Z\d]{0,3}$/.test(flight.callsign)) {
                        flights.delete(id);
                        continue;
                    }
@@ -423,7 +424,7 @@ program.command("gen")
                    ));
                }
 
-               // if there is an airline and the callsign start with more than 3 letters
+               // if there is an airline and the callsign starts with more than 3 letters
                else if (flight.callsign !== null && /^[A-Z]{4,}/.test(flight.callsign.toUpperCase())) {
                    flights.set(id, new Flight(
                        flight.id,
