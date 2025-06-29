@@ -372,6 +372,7 @@ program.command("gen")
                        [/^VP-L[A-Z]{2}$/, 4], // British Virgin Islands (VP-L)
                        [/^V[PQ]-C[A-Z]{2}$/, 4], // Cayman Islands (VP-C VQ-C)
                        [/^CU-[ACHNTU]1\d{4}$/, 5], // Cuba (CU-A1 CU-C1 CU-H1 CU-N1 CU-T1 CU-U1)
+                       [/^(?:PA|PM|PZ|PK|MK|RF|WF)\d{3}$/, 2] // UK RAF (PA, PM, PZ, PK, MK, RF, WF)
                    ];
                    const match = regexes.find(([regex]) => regex.test(flight.callsign!)) ?? null;
                    if (match !== null) {
