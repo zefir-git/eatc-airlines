@@ -424,7 +424,7 @@ program.command("gen")
                    ));
                }
 
-               // if there is an airline and the callsign start with more than 3 letters
+               // if there is an airline and the callsign starts with more than 3 letters
                else if (flight.callsign !== null && /^[A-Z]{4,}/.test(flight.callsign.toUpperCase())) {
                    flights.set(id, new Flight(
                        flight.id,
