@@ -462,8 +462,6 @@ program.command("gen")
                        pronunciation = callsigns.get(flight.airline.toUpperCase())
                            ?? flight.airline.toUpperCase().split("")
                                .map(c => PHONETIC[c as keyof typeof PHONETIC] ?? c).join(" ");
-                   if (pronunciation !== null && !flight.airline?.endsWith("-") && !Array.from(callsigns.values()).includes(pronunciation))
-                       process.stderr.write(`WARNING! ${flight.airline}: no pronunciation available\n`);
                    merged.push({
                        airline: flight.airline!,
                        type: new Set([flight.type]),
@@ -477,8 +475,16 @@ program.command("gen")
 
            // calculate score
            const maxFlights = Math.max(...merged.map(m => m.flights.length));
-           for (const m of merged)
+           for (const m of merged) {
                m.score = Math.round((m.flights.length / maxFlights) * 1000) / 100;
+               if (
+                   m.pronunciation !== null
+                   && m.score > 0 && m.score <= 0.005
+                   && !m.airline?.endsWith("-")
+                   && !Array.from(callsigns.values()).includes(m.pronunciation)
+               )
+                   process.stderr.write(`WARNING! ${m.airline}: no pronunciation available\n`);
+           }
 
            process.stdout.write(merged
                    .filter(m => m.score >= 0.005)
