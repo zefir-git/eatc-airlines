@@ -29,7 +29,8 @@
     "data/"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "start": "node dist/cli.js"
   },
   "devDependencies": {
     "@types/node": "^22.13.5",
