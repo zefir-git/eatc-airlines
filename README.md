@@ -5,11 +5,11 @@ ATC* airline configurations.
 
 ## Features
 
-- Fetch scheduled and past flights (up to 7 days) from [AirNav Radar](https://airnavradar.com).
+- Fetch scheduled and past flights (up to 7 days, or [1 year with a subscription](https://github.com/zefir-git/eatc-airlines/pull/55)) from [AirNav Radar](https://airnavradar.com).
 - Convert flight data into `airlines` configuration for *Endless ATC* custom airspace.
 - Analyse traffic flow statistics from flight data.
 - Simple, fast, and works offline once data is fetched.
-- No API key or authentication required.
+- No API key or authentication necessary.
 
 ---
 
@@ -78,6 +78,9 @@ mkdir EGLL && cd EGLL
 eatc-airlines fetch EGLL
 ```
 
+> [!CAUTION]
+> Requests might be blocked by Cloudflare. Please see [#52](https://github.com/zefir-git/eatc-airlines/pull/52).
+
 > [!NOTE]
 > The fetched JSON files should not be manually edited unless you know what you are doing.
 
@@ -106,9 +109,6 @@ eatc-airlines gen ./EGLL
 
 # Convert specific files
 eatc-airlines gen file1.json file2.json
-
-# Save output to a file
-eatc-airlines gen ./EGLL > EGLL-airlines.txt
 ```
 
 ---
@@ -143,3 +143,7 @@ For inquiries or collaboration, contact:
 | Matrix | [@zefir:cloudnode.pro](https://matrix.to/#/@zefir:cloudnode.pro) |
 |--------|------------------------------------------------------------------|
 | E-mail | [eatc+airlines@zefir.pro](mailto:eatc+airlines@zefir.pro)        |
+
+---
+
+This project is not authorised, endorsed, or associated with AirNav Radar or Endless ATC in any way.
