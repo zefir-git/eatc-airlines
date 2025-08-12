@@ -94,6 +94,7 @@ async function get(icao: string, t: Date, ua?: string, cf?: string, session?: st
     url.searchParams.set("max", (t.getTime() / 1000).toFixed(0));
 
     const requestHeaders = new Headers();
+    requestHeaders.set("Referer", "https://www.airnavradar.com/data/airports/" + icao);
     if (ua !== undefined)
         requestHeaders.set("User-Agent", ua);
     if (cf !== undefined)
