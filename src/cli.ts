@@ -480,7 +480,7 @@ program.command("gen")
                m.score = Math.round((m.flights.length / maxFlights) * 1000) / 100;
                if (
                    m.pronunciation !== null
-                   && m.score > 0 && m.score <= 0.005
+                   && m.score >= 0.005
                    && !m.airline?.endsWith("-")
                    && !Array.from(callsigns.values()).includes(m.pronunciation)
                )
