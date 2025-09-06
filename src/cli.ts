@@ -88,9 +88,10 @@ program
     .helpOption("-h, --help", "Display help for command.")
     .helpCommand("help [command]", "Display help for command.");
 
-async function get(icao: string, t: Date, ua?: string, cf?: string, session?: string): Promise<{list: Flight[], more: boolean, oldest: Date}> {
+async function get(icao: string, t: Date, key: "mrgapdstic" | "mrgaporgic", ua?: string, cf?: string, session?: string): Promise<{list: Flight[], more: boolean, oldest: Date}> {
+    const departures = key === "mrgaporgic";
     const url = new URL(icao, "https://www.airnavradar.com/data/airports/search/");
-    url.searchParams.set("key", "mrgapdstic");
+    url.searchParams.set("key", key);
     url.searchParams.set("max", (t.getTime() / 1000).toFixed(0));
 
     const requestHeaders = new Headers();
@@ -126,8 +127,13 @@ async function get(icao: string, t: Date, ua?: string, cf?: string, session?: st
             if (typeof flight.fid !== "number") continue;
             const id = flight.fid;
             // actual, estimated, scheduled
-            if (typeof (flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) !== "number") continue;
-            const time = new Date((flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) as number * 1000);
+            if (typeof (departures ?
+                flight.depau ?? flight.depeu ?? flight.depsu ?? flight.depsts
+                : flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts
+            ) !== "number") continue;
+            const time = new Date((departures ?
+                flight.depau ?? flight.depeu ?? flight.depsu ?? flight.depsts
+                : flight.arrau ?? flight.arreu ?? flight.arrsu ?? flight.arrsts) as number * 1000);
             if (flight.acr !== null && typeof flight.acr !== "string") continue;
             const tail = flight.acr;
             if (typeof flight.act !== "string" || flight.act === "GRND" || flight.act.toLowerCase() === "zzzz") continue;
@@ -216,10 +222,11 @@ function bar(label: string, value: any, percent: number, colour = accent) {
 }
 
 program.command("fetch")
-       .description("Fetch arriving flights from airnavradar.com API.")
+       .description("Fetch flights from airnavradar.com API.")
        .argument("<icao>", "ICAO code of the airport.")
        .argument("[path]", "Path where the retrieved data will be saved in JSON format. Use a dash ('-') to write to standard output.")
        .option("-c, --concurrency <count>", "Number of requests to send in parallel.", "5")
+       .option("-d, --departures", "Also fetch departures (instead of only arrivals).")
        .option("-s, --silent", "Silent mode (no progress indicator).")
        .option("-u, --user-agent <name>", "User agent string to send to the API.")
        .option("-C, --cloudflare <cookie>", "Cloudflare clearance cookie to send to the API.")
@@ -230,8 +237,6 @@ program.command("fetch")
            const concurrency = Number.parseInt(options.concurrency);
            if (Number.isNaN(concurrency) || !Number.isFinite(concurrency))
                program.error("concurrency must be valid integer");
-
-           if (options.silent !== true) process.stderr.write(`Fetching flights for ${icao}…\n`);
 
            const started = new Date();
 
@@ -264,15 +269,7 @@ program.command("fetch")
            }
 
            const flights = new Map<number, Flight>();
-           progress(flights, started);
            const progressInterval = setInterval(() => progress(flights, started), 1000);
-
-           const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), options.userAgent, options.cloudflare, options.session);
-           for (const flight of initial.list)
-               flights.set(flight.id, flight);
-           progress(flights, started);
-           let more = initial.more;
-           let t = new Date(initial.oldest.getTime() + 27e5);
 
            process.once("SIGINT", async () => {
                clearInterval(progressInterval);
@@ -283,7 +280,57 @@ program.command("fetch")
                process.exit(0);
            });
 
+           const keys: ("mrgapdstic" | "mrgaporgic")[] = ["mrgapdstic"];
+           if (options.departures)
+               keys.push("mrgaporgic");
 
+           for (const key of keys) {
+               if (options.silent !== true) process.stderr.write(`\nFetching ${key === "mrgapdstic" ? "arrivals" : "departures"} for ${icao}…\n`);
+               progress(flights, started);
+               const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), key, options.userAgent, options.cloudflare, options.session);
+               for (const flight of initial.list)
+                   flights.set(flight.id, flight);
+               progress(flights, started);
+               let more = initial.more;
+               let t = new Date(initial.oldest.getTime() + 27e5);
+
+               while (more) {
+                   const promises: ReturnType<typeof get>[] = [];
+                   for (let i = 0; i < concurrency; ++i) {
+                       promises.push(get(icao, new Date(t), key, options.userAgent, options.cloudflare, options.session));
+                       t = new Date(t.getTime() - 27e5);
+                   }
+                   const results = await Promise.allSettled(promises);
+                   let error: Error | null = null;
+                   for (const result of results) {
+                       if (result.status === "rejected") {
+                           error = result.reason;
+                           break;
+                       }
+                       for (const flight of result.value.list)
+                           flights.set(flight.id, flight);
+                   }
+                   if (error !== null) {
+                       clearInterval(progressInterval);
+                       if (options.silent !== true) process.stderr.write("\n");
+                       console.log(error);
+                       if (location !== "-") {
+                           process.stdout.write(`Saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
+                       }
+                       await finalSave();
+                       return;
+                   }
+                   more = results.filter(r => r.status === "fulfilled").every(r => r.value.more);
+                   progress(flights, started);
+
+                   if (location !== "-")
+                       await fs.writeFile(location, JSON.stringify(Array.from(flights.values())));
+               }
+
+               clearInterval(progressInterval);
+               if (options.silent !== true) process.stderr.write("\n");
+               process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.\nWriting to ${location}…`);
+           }
 
            async function finalSave() {
                const json = JSON.stringify(Array.from(flights.values()));
@@ -293,43 +340,6 @@ program.command("fetch")
                    process.stdout.write(`\r\nWritten to ${location}.\n`);
                }
            }
-
-           while (more) {
-               const promises: ReturnType<typeof get>[] = [];
-               for (let i = 0; i < concurrency; ++i) {
-                   promises.push(get(icao, new Date(t), options.userAgent, options.cloudflare, options.session));
-                   t = new Date(t.getTime() - 27e5);
-               }
-               const results = await Promise.allSettled(promises);
-               let error: Error | null = null;
-               for (const result of results) {
-                   if (result.status === "rejected") {
-                       error = result.reason;
-                       break;
-                   }
-                   for (const flight of result.value.list)
-                       flights.set(flight.id, flight);
-               }
-               if (error !== null) {
-                   clearInterval(progressInterval);
-                   if (options.silent !== true) process.stderr.write("\n");
-                   console.log(error);
-                   if (location !== "-") {
-                       process.stdout.write(`Saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
-                   }
-                   await finalSave();
-                   return;
-               }
-               more = results.filter(r => r.status === "fulfilled").every(r => r.value.more);
-               progress(flights, started);
-
-               if (location !== "-")
-                   await fs.writeFile(location, JSON.stringify(Array.from(flights.values())));
-           }
-
-           clearInterval(progressInterval);
-           if (options.silent !== true) process.stderr.write("\n");
-           process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.\nWriting to ${location}…`);
            await finalSave();
        });
 
