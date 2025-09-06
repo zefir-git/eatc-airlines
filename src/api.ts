@@ -195,6 +195,11 @@ export class Flight {
     public readonly from: Location;
 
     /**
+     * The type of the flight from the perspective of the context airport.
+     */
+    public readonly bound: "arrival" | "departure";
+
+    /**
      * @param id Unique ID
      * @param time Flight arrival time (or estimate)
      * @param tail Tail number (aircraft registration)
@@ -203,6 +208,7 @@ export class Flight {
      * @param callsign Flight callsign
      * @param to Flight destination
      * @param from Flight origin
+     * @param [bound] The type of the flight from the perspective of the context airport.
      */
     public constructor(
         id: number,
@@ -212,7 +218,8 @@ export class Flight {
         airline: string | null,
         callsign: string | null,
         to: Location,
-        from: Location
+        from: Location,
+        bound: "arrival" | "departure" = "arrival"
     ) {
         this.id = id;
         this.time = time;
@@ -222,6 +229,11 @@ export class Flight {
         this.callsign = callsign;
         this.to = to;
         this.from = from;
+        this.bound = bound;
+    }
+
+    public direction() {
+        return this.bound === "arrival" ? this.to.direction(this.from) : this.from.direction(this.to);
     }
 
     public toJSON() {
@@ -234,6 +246,7 @@ export class Flight {
             callsign: this.callsign,
             to: this.to,
             from: this.from,
+            bound: this.bound,
         };
     }
 }
