@@ -60,6 +60,7 @@ async function loadFlightsFromFs(file: string, _currentDepth: number = 0): Promi
             flight.callsign,
             new Location(flight.to.name, flight.to.lat, flight.to.lon),
             new Location(flight.from.name, flight.from.lat, flight.from.lon),
+            flight.bound
         ));
     return flights;
 }
@@ -150,7 +151,7 @@ async function get(icao: string, t: Date, key: "mrgapdstic" | "mrgaporgic", ua?:
             if (typeof flight.aporgic !== "string" || typeof flight.aporgla !== "number" || typeof flight.aporglo !== "number") continue;
             const from = new Location(flight.aporgic, flight.aporgla, flight.aporglo);
             if (to.name === from.name) continue;
-            flights.push(new Flight(id, time, tail, type, airline, callsign, to, from));
+            flights.push(new Flight(id, time, tail, type, airline, callsign, to, from, from.name === icao ? "departure" : "arrival"));
             if (time < oldest) oldest = time;
         }
         return {list: flights, more, oldest};
@@ -193,7 +194,8 @@ async function loadFlights(paths: Set<string>) {
                     flight.callsign,
                     new Location(flight.to.name, flight.to.lat, flight.to.lon),
                     new Location(flight.from.name, flight.from.lat, flight.from.lon),
-                ))
+                    flight.bound
+                ));
             continue;
         }
 
@@ -384,6 +386,7 @@ program.command("gen")
                                flight.callsign,
                                new Location(flight.to.name, flight.to.lat, flight.to.lon),
                                new Location(flight.from.name, flight.from.lat, flight.from.lon),
+                               flight.bound
                            ));
                            continue;
                        }
@@ -396,6 +399,7 @@ program.command("gen")
                            flight.callsign,
                            new Location(flight.to.name, flight.to.lat, flight.to.lon),
                            new Location(flight.from.name, flight.from.lat, flight.from.lon),
+                           flight.bound
                        ));
                        continue;
                    }
@@ -418,6 +422,7 @@ program.command("gen")
                        flight.callsign,
                        new Location(flight.to.name, flight.to.lat, flight.to.lon),
                        new Location(flight.from.name, flight.from.lat, flight.from.lon),
+                       flight.bound
                    ));
                }
 
@@ -432,6 +437,7 @@ program.command("gen")
                        flight.callsign,
                        flight.to,
                        flight.from,
+                       flight.bound
                    ));
                }
            }
@@ -452,7 +458,7 @@ program.command("gen")
            const callsigns = new Map<string, string>(Object.entries(JSON.parse(await fs.readFile(path.join(PATH, "..", "data", "callsigns.json"), "utf-8"))));
            for (const flight of flights.values()) {
                if (flight.airline === undefined) continue;
-               const direction = flight.to.direction(flight.from)!;
+               const direction = flight.direction();
                const existing = merged.find(m => m.airline === flight.airline && m.type.has(flight.type) && m.direction.has(direction));
                if (existing !== undefined) {
                    existing.flights.push(flight);
