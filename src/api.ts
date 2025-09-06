@@ -129,6 +129,47 @@ export class Direction {
      */
     public static W = new Direction("W");
 
+    /**
+     * Arrow North
+     */
+    public static ARR_N = new Direction("↑");
+
+    /**
+     * Arrow North-East
+     */
+    public static ARR_NE = new Direction("↗");
+
+    /**
+     * Arrow East
+     */
+    public static ARR_E = new Direction("→");
+
+    /**
+     * Arrow South-East
+     */
+    public static ARR_SE = new Direction("↘");
+
+    /**
+     * Arrow South
+     */
+    public static ARR_S = new Direction("↓");
+
+    /**
+     * Arrow South-West
+     */
+    public static ARR_SW = new Direction("↙");
+
+    /**
+     * Arrow West
+     */
+    public static ARR_W = new Direction("←");
+
+    /**
+     * Arrow North-West
+     */
+    public static ARR_NW = new Direction("↖");
+
+    /** */
     private constructor(public readonly name: string) {
     }
 
@@ -142,6 +183,23 @@ export class Direction {
         if (normalisedBearing >= 135 && normalisedBearing < 225) return Direction.S;
         if (normalisedBearing >= 45 && normalisedBearing < 135) return Direction.E;
         return Direction.N;
+    }
+
+    /**
+     * Get arrow direction from bearing
+     * @param bearing Bearing in decimal degrees
+     */
+    public static arrowFromBearing(bearing: number): Direction {
+        const normalisedBearing = (bearing + 360) % 360;
+
+        if (normalisedBearing >= 337.5 || normalisedBearing < 22.5) return Direction.ARR_N;
+        if (normalisedBearing >= 22.5 && normalisedBearing < 67.5) return Direction.ARR_NE;
+        if (normalisedBearing >= 67.5 && normalisedBearing < 112.5) return Direction.ARR_E;
+        if (normalisedBearing >= 112.5 && normalisedBearing < 157.5) return Direction.ARR_SE;
+        if (normalisedBearing >= 157.5 && normalisedBearing < 202.5) return Direction.ARR_S;
+        if (normalisedBearing >= 202.5 && normalisedBearing < 247.5) return Direction.ARR_SW;
+        if (normalisedBearing >= 247.5 && normalisedBearing < 292.5) return Direction.ARR_W;
+        return Direction.ARR_NW;
     }
 
     public toString(): string {
@@ -234,6 +292,14 @@ export class Flight {
 
     public direction() {
         return this.bound === "arrival" ? this.to.direction(this.from) : this.from.direction(this.to);
+    }
+
+    public arrow() {
+        return Direction.arrowFromBearing(this.bearing());
+    }
+
+    public bearing() {
+        return this.bound === "arrival" ? this.to.bearing(this.from) : this.from.bearing(this.to);
     }
 
     public toJSON() {

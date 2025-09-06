@@ -208,8 +208,12 @@ async function loadFlights(paths: Set<string>) {
 
 const accent = `\x1b[38;2;${[0, 188, 125].join(";")}m`;
 const bold = "\x1b[1m";
-const dim = "\x1b[38;5;250m";
+const dim = "\x1b[2m";
+const brightBlack = "\x1b[90m";
+const brightGreen = "\x1b[92m";
+const brightMagenta = "\x1b[95m";
 const reset = "\x1b[0m";
+const link = (label: string, url: URL | string) => `\x1b]8;;${url}\x1b\\${label}\x1b]8;;\x1b\\`;
 
 function bar(label: string, value: any, percent: number, colour = accent) {
     const char = "▇";
@@ -221,6 +225,44 @@ function bar(label: string, value: any, percent: number, colour = accent) {
         bar = "▏";
     else bar = char.repeat(Math.round(bars * percent));
     process.stdout.write(`${label}${dim}:${reset} ${colour}${bar}${reset} ${value}\n`);
+}
+
+function printTable<T extends Record<string, unknown>>(data: T[]): void {
+    if (data.length === 0) {
+        console.log("No data to display.");
+        return;
+    }
+
+    const headers = Object.keys(data[0]!);
+    const rows: string[][] = data.map(obj =>
+        headers.map(h => String(obj[h] ?? ""))
+    );
+
+    const ansiRegex = /\x1b\[[0-9;]*m|\x1b\]8;;.*?\x1b\\|\x1b\][0-9]{1,2};.*?\x1b\\/g;
+
+    const stripAnsi = (str: string) => str.replace(ansiRegex, "");
+
+    const colWidths = headers.map((h, i) =>
+        Math.max(
+            stripAnsi(h).length,
+            ...rows.map(r => stripAnsi(r[i]!).length)
+        )
+    );
+
+    const pad = (text: string, width: number): string => {
+        const visibleLength = stripAnsi(text).length;
+        return text + " ".repeat(width - visibleLength);
+    };
+
+    const headerLine = headers.map((h, i) => pad(`${bold}${h}${reset}`, colWidths[i]!)).join(` ${brightBlack}│${reset} `);
+    const separator = colWidths.map(w => brightBlack + "─".repeat(w)).join("─┼─") + reset;
+
+    console.log(headerLine);
+    console.log(separator);
+
+    rows.forEach(row => {
+        console.log(row.map((cell, i) => pad(cell, colWidths[i]!)).join(` ${brightBlack}│${reset} `));
+    });
 }
 
 program.command("fetch")
@@ -602,6 +644,50 @@ program.command("flow")
            const hourlyAverageMax = Math.max(...hourlyAverage);
            for (const [hour, flights] of hourlyAverage.entries())
                bar(hour.toString().padStart(2, "0") + ":00Z", flights.toFixed(2), flights / hourlyAverageMax);
+       });
+
+program.command("table")
+       .description("Print all flights in a neat table.")
+       .argument("<paths...>", "Paths to JSON files or directories containing JSON files. Use a dash ('-') to read from standard input.")
+       .option("-a, --after <date>", "Show only flights after specified date.")
+       .option("-b, --before <date>", "Show only flights before specified date.")
+       .option("-l, --limit <number>", "Limit the number of flights (rows) to show.")
+       .option("-r, --reverse", "Reverse the order of flights.")
+       .action(async (p, options) => {
+           const paths = new Set<string>(p);
+           const flights = await loadFlights(paths);
+
+           const after = options.after !== undefined ? new Date(options.after) : null;
+           const before = options.before !== undefined ? new Date(options.before) : null;
+           const limit = options.limit !== undefined ? Number(options.limit) : Infinity;
+
+           if (after !== null && Number.isNaN(after.getTime()))
+               program.error("Invalid date: " + options.after);
+           if (before !== null && Number.isNaN(before.getTime()))
+               program.error("Invalid date: " + options.before);
+
+           const data = Array.from(flights.values())
+                .sort((a, b) => a.time.getTime() - b.time.getTime())
+                .filter(f => (
+                   (after === null || f.time.getTime() >= after.getTime())
+                   && (before === null || f.time.getTime() <= before.getTime())
+                ))
+                .slice(0, limit)
+                .map(f => ({
+                   "Time (UTC)": dim + f.time.toLocaleString("en-US", {month: "short", day: "numeric", hour: "numeric", minute: "numeric", hour12: false, timeZone: "UTC"}) + reset,
+                   Callsign: f.callsign ?? `${dim}n/a${reset}`,
+                   Tail: f.tail ?? `${dim}n/a${reset}`,
+                   Type: f.type,
+                   Bound: (f.bound === "arrival" ? brightGreen : brightMagenta) + f.bound.toUpperCase().slice(0, 3) + reset,
+                   From: (f.bound === "arrival" ? brightGreen : brightMagenta) + f.from.name + reset,
+                   To: (f.bound === "arrival" ? brightMagenta : brightGreen) + f.to.name + reset,
+                   Direction: `${f.bearing().toFixed(0).padStart(3, "0")}° ${dim}${f.direction()} ${f.arrow()}${reset}`,
+                   Replay: f.callsign || f.tail ? link("Replay", new URL(`${f.callsign ?? f.tail}/${f.id}`, "https://www.airnavradar.com/data/flights/")) : ""
+                }));
+           if (options.reverse)
+               data.reverse();
+
+           printTable(data);
        });
 
 program.parse();
