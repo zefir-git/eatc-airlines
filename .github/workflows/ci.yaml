@@ -36,7 +36,7 @@ jobs:
         run: npm pack
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: package
           path: eatc-airlines-0.0.0-dev.tgz
