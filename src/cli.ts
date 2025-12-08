@@ -301,43 +301,35 @@ program.command("fetch")
 
            const started = new Date();
 
-           function progress(flights: Map<number, Flight>, started: Date) {
+           const flightIds = new Set<number>();
+           let fetchedCount = 0;
+           let oldestFlight: Date | null = null;
+
+           function progress() {
                if (options.silent) return;
-
-               const week = new Date(started.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-               const allFlights = Array.from(flights.values());
-               const older = allFlights.slice(-concurrency * 30);
-               const oldest = older.length > 0 ? older.reduce((f, g) => f.time.getTime() < g.time.getTime() ? f : g).time : null;
-
-               let message: string;
-               if (oldest !== null && oldest.getTime() < week.getTime()) {
-                   message = `\r[${timeAgo(started)}] Fetched: ${flights.size}. Oldest flight: ${oldest.toLocaleDateString(void 0, {
+               const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
+               let message = `\r[${timeAgo(started)}] Fetched: ${fetchedCount} flight${fetchedCount === 1 ? "" : "s"}`;
+               if (elapsed > 0)
+                   message += ` ${dim}(${Math.round(fetchedCount / elapsed)} per second)${reset}`
+               message += ".";
+               if (oldestFlight !== null)
+                   message += ` Oldest flight: ${oldestFlight.toLocaleDateString(void 0, {
                        day: "numeric",
                        weekday: "short",
                        month: "short",
                        year: "numeric",
-                   })} \x1b[2mEstimation of remaining flights not possible.\x1b[0m`;
-               }
-               else {
-                   const thisWeek = allFlights.filter(f => f.time.getTime() >= week.getTime());
-                   const averagePerDay = thisWeek.length / new Set(thisWeek.map(f => f.time.toDateString())).size;
-                   const remainingDays = ((oldest?.getTime() ?? week.getTime()) - week.getTime()) / (24 * 60 * 60 * 1000);
-                   const estimated = Math.round(averagePerDay * remainingDays);
-                   message = `\r[${timeAgo(started)}] Fetched: ${flights.size} of ${Number.isNaN(estimated) ? "N/A" : (flights.size + estimated)} (estimated).${oldest !== null ? ` Oldest flight: ${oldest.toLocaleDateString( void 0, {day: "numeric", weekday: "short", month: "short", year: "numeric"})}` : ""}`;
-               }
+                   })}.`;
                process.stderr.write(message + " ".repeat(Math.max(0, process.stdout.columns - message.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "").length)));
            }
 
-           const flights = new Map<number, Flight>();
-           const progressInterval = setInterval(() => progress(flights, started), 1000);
+           const progressInterval = setInterval(() => progress(), 1000);
 
            process.once("SIGINT", async () => {
                clearInterval(progressInterval);
                if (options.silent !== true) process.stderr.write("\n");
                if (location !== "-")
-                   process.stdout.write(`SIGINT received, saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
-               process.exit(0);
+                   process.stdout.write(`SIGINT received.`);
+               process.exit(130);
            });
 
            const keys: ("mrgapdstic" | "mrgaporgic")[] = ["mrgapdstic"];
@@ -345,13 +337,23 @@ program.command("fetch")
                keys.push("mrgaporgic");
 
            for (const key of keys) {
-               if (options.silent !== true) process.stderr.write(`\nFetching ${key === "mrgapdstic" ? "arrivals" : "departures"} for ${icao}…\n`);
-               progress(flights, started);
-               const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), key, options.userAgent, options.cloudflare, options.session);
+               if (options.silent !== true) process.stderr.write(`\nFetching ${key === "mrgapdstic"
+                   ? "arrivals"
+                   : "departures"} for ${icao}…\n`);
+               progress();
+               const initial = await get(
+                   icao,
+                   new Date(Date.now() + 24 * 60 * 60 * 1000),
+                   key, options.userAgent,
+                   options.cloudflare,
+                   options.session
+               );
                const newInitial: Flight[] = [];
                for (const flight of initial.list) {
-                   if (!flights.has(flight.id)) {
-                       flights.set(flight.id, flight);
+                   if (!flightIds.has(flight.id)) {
+                       flightIds.add(flight.id);
+                       fetchedCount++;
+                       if (!oldestFlight || flight.time < oldestFlight) oldestFlight = flight.time;
                        newInitial.push(flight);
                    }
                }
@@ -362,7 +364,7 @@ program.command("fetch")
                    else
                        await fs.appendFile(location, chunk);
                }
-               progress(flights, started);
+               progress();
                let more = initial.more;
                let t = new Date(initial.oldest.getTime() + 27e5);
 
@@ -381,8 +383,10 @@ program.command("fetch")
                            break;
                        }
                        for (const flight of result.value.list) {
-                           if (!flights.has(flight.id)) {
-                               flights.set(flight.id, flight);
+                           if (!flightIds.has(flight.id)) {
+                               flightIds.add(flight.id);
+                               fetchedCount++;
+                               if (!oldestFlight || flight.time < oldestFlight) oldestFlight = flight.time;
                                newlyFetched.push(flight);
                            }
                        }
@@ -401,12 +405,12 @@ program.command("fetch")
                            await fs.appendFile(location, chunk);
                    }
                    more = results.filter(r => r.status === "fulfilled").every(r => r.value.more);
-                   progress(flights, started);
+                   progress();
                }
 
                clearInterval(progressInterval);
                if (options.silent !== true) process.stderr.write("\n");
-               process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.`);
+               process.stdout.write(`Fetched ${fetchedCount} flight${fetchedCount === 1 ? "" : "s"}.`);
            }
        });
 
