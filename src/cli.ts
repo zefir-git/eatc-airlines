@@ -308,7 +308,7 @@ program.command("fetch")
            function progress() {
                if (options.silent) return;
                const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
-               let message = `\r[${timeAgo(started)}] Fetched: ${fetchedCount}`;
+               let message = `\r[${timeAgo(started)}] Fetched: ${fetchedCount} flight${fetchedCount === 1 ? "" : "s"}`;
                if (elapsed > 0)
                    message += ` ${dim}(${Math.round(fetchedCount / elapsed)} per second)${reset}`
                message += ".";
