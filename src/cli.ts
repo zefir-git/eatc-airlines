@@ -45,11 +45,28 @@ async function loadFlightsFromFs(file: string, _currentDepth: number = 0): Promi
     const contents = await fs.readFile(file, "utf-8");
     let rawFlights: any[];
     try {
-        rawFlights = JSON.parse(contents);
+        const parsed = JSON.parse(contents);
+        rawFlights = Array.isArray(parsed) ? parsed : [parsed];
     }
     catch (e) {
-        return program.error(`${file}: ${e instanceof Error ? e.message : "JSON.parse: failed to parse"}`);
+        rawFlights = [];
+        const lines = contents.trim().split("\n");
+        if (lines.length === 1)
+            return program.error(`${file}: ${e instanceof Error ? e.message : "JSON.parse: failed to parse"}`);
+
+        for (let i = 0; i < lines.length; ++i) {
+            const line = lines[i]!.trim();
+            if (line === "") continue;
+
+            try {
+                rawFlights.push(JSON.parse(line));
+            }
+            catch (err) {
+                return program.error(`${file}:${i + 1}: ${(err as Error).message}`);
+            }
+        }
     }
+
     for (const flight of rawFlights)
         flights.push(new Flight(
             flight.id,
@@ -268,7 +285,7 @@ function printTable<T extends Record<string, unknown>>(data: T[]): void {
 program.command("fetch")
        .description("Fetch flights from airnavradar.com API.")
        .argument("<icao>", "ICAO code of the airport.")
-       .argument("[path]", "Path where the retrieved data will be saved in JSON format. Use a dash ('-') to write to standard output.")
+       .argument("[path]", "Path where the retrieved data will be saved in NDJSON format. Use a dash ('-') to write to standard output.")
        .option("-c, --concurrency <count>", "Number of requests to send in parallel.", "5")
        .option("-d, --departures", "Also fetch departures (instead of only arrivals).")
        .option("-s, --silent", "Silent mode (no progress indicator).")
@@ -320,7 +337,6 @@ program.command("fetch")
                if (options.silent !== true) process.stderr.write("\n");
                if (location !== "-")
                    process.stdout.write(`SIGINT received, saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
-               await finalSave();
                process.exit(0);
            });
 
@@ -332,8 +348,20 @@ program.command("fetch")
                if (options.silent !== true) process.stderr.write(`\nFetching ${key === "mrgapdstic" ? "arrivals" : "departures"} for ${icao}…\n`);
                progress(flights, started);
                const initial = await get(icao, new Date(Date.now() + 24 * 60 * 60 * 1000), key, options.userAgent, options.cloudflare, options.session);
-               for (const flight of initial.list)
-                   flights.set(flight.id, flight);
+               const newInitial: Flight[] = [];
+               for (const flight of initial.list) {
+                   if (!flights.has(flight.id)) {
+                       flights.set(flight.id, flight);
+                       newInitial.push(flight);
+                   }
+               }
+               if (newInitial.length > 0) {
+                   const chunk = newInitial.map(f => JSON.stringify(f)).join("\n") + "\n";
+                   if (location === "-")
+                       process.stdout.write(chunk);
+                   else
+                       await fs.appendFile(location, chunk);
+               }
                progress(flights, started);
                let more = initial.more;
                let t = new Date(initial.oldest.getTime() + 27e5);
@@ -346,45 +374,40 @@ program.command("fetch")
                    }
                    const results = await Promise.allSettled(promises);
                    let error: Error | null = null;
+                   const newlyFetched: Flight[] = [];
                    for (const result of results) {
                        if (result.status === "rejected") {
                            error = result.reason;
                            break;
                        }
-                       for (const flight of result.value.list)
-                           flights.set(flight.id, flight);
+                       for (const flight of result.value.list) {
+                           if (!flights.has(flight.id)) {
+                               flights.set(flight.id, flight);
+                               newlyFetched.push(flight);
+                           }
+                       }
                    }
                    if (error !== null) {
                        clearInterval(progressInterval);
                        if (options.silent !== true) process.stderr.write("\n");
                        console.log(error);
-                       if (location !== "-") {
-                           process.stdout.write(`Saving ${flights.size} fetched flight${flights.size === 1 ? "" : "s"} to ${location}…`);
-                       }
-                       await finalSave();
                        return;
+                   }
+                   if (newlyFetched.length > 0) {
+                       const chunk = newlyFetched.map(f => JSON.stringify(f)).join("\n") + "\n";
+                       if (location === "-")
+                           process.stdout.write(chunk);
+                       else
+                           await fs.appendFile(location, chunk);
                    }
                    more = results.filter(r => r.status === "fulfilled").every(r => r.value.more);
                    progress(flights, started);
-
-                   if (location !== "-")
-                       await fs.writeFile(location, JSON.stringify(Array.from(flights.values())));
                }
 
                clearInterval(progressInterval);
                if (options.silent !== true) process.stderr.write("\n");
-               process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.\nWriting to ${location}…`);
+               process.stdout.write(`Fetched ${flights.size} flight${flights.size === 1 ? "" : "s"}.`);
            }
-
-           async function finalSave() {
-               const json = JSON.stringify(Array.from(flights.values()));
-               if (location === "-") process.stdout.write(json);
-               else {
-                   await fs.writeFile(location, json);
-                   process.stdout.write(`\r\nWritten to ${location}.\n`);
-               }
-           }
-           await finalSave();
        });
 
 program.command("gen")
