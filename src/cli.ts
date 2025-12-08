@@ -62,7 +62,7 @@ async function loadFlightsFromFs(file: string, _currentDepth: number = 0): Promi
                 rawFlights.push(JSON.parse(line));
             }
             catch (err) {
-                return program.error(`${file}:${i + 1}: ${(err as Error).message}`);
+                return program.error(`${file}:${i + 1}: ${(err instanceof Error ? err.message : "JSON.parse: failed to parse NDJSON")}`);
             }
         }
     }
